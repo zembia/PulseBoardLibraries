@@ -1,0 +1,42 @@
+#######################################
+# Syntax Coloring Map NVS
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+pulseIoPort	KEYWORD1
+pulseAiPort	KEYWORD1
+PCAL9535A	KEYWORD1
+FRAM_FM24	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+setCredentials	KEYWORD2
+configMqtt	KEYWORD2
+setSamplePeriod	KEYWORD2
+getUser	KEYWORD2
+getPassword	KEYWORD2
+begin	KEYWORD2
+writeGPIO	KEYWORD2
+writeGPIO16	KEYWORD2
+readGPIO16	KEYWORD2
+readGPIO	KEYWORD2
+pinMode	KEYWORD2
+digitalWrite	KEYWORD2
+digitalRead	KEYWORD2
+pinSetPull	KEYWORD2
+pinSetDriveStrength	KEYWORD2
+pinSetInputInversion	KEYWORD2
+pinSetInputLatch	KEYWORD2
+pinSetInterruptEnabled	KEYWORD2
+getLastInterruptPin	KEYWORD2
+getInterruptPinValue	KEYWORD2
+portSetOutputMode	KEYWORD2
+
+
+#######################################
+# Constants (LITERAL1)
+#######################################
