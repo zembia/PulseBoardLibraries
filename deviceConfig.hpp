@@ -28,8 +28,12 @@ class deviceConfig{
         void setCredentials(String user, String password);
         void configMqtt(String mqttUrl,String mqttTopic, uint16_t mqttPort);
         void setSamplePeriod(uint16_t);
+        String getUrl(void);
         String getUser(void);
         String getPassword(void);
+        uint16_t getPort(void);
+        String getTopic(void);
+        uint16_t getSamplePeriod(void);
     private:
         String      _user;
         String      _password;

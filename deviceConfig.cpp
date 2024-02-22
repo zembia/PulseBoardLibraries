@@ -31,6 +31,23 @@ void deviceConfig::configMqtt(String mqttUrl,String mqttTopic, uint16_t mqttPort
     _preferences.end();
 }
 
+String deviceConfig::getUrl(void)
+{
+    return _mqttUrl;
+}
+uint16_t deviceConfig::getPort(void)
+{
+    return _mqttPort;
+}
+String deviceConfig::getTopic(void)
+{
+    return _mqttTopic;
+}
+
+uint16_t deviceConfig::getSamplePeriod(void)
+{
+    return _samplePeriod;
+}
 
 void deviceConfig::_refreshMqtt(void)
 {
