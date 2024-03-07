@@ -74,13 +74,13 @@ void deviceConfig::setSamplePeriod(uint16_t samplePeriod)
         _preferences.end();
     }
 }
-String deviceConfig::getUser(void)
+const char *deviceConfig::getUser(void)
 {
-    return _user;
+    return _user.c_str();
 }
-String deviceConfig::getPassword(void)
+const char* deviceConfig::getPassword(void)
 {
-    return _password;
+    return _password.c_str();
 }
 void deviceConfig::setCredentials(String user, String password)
 {

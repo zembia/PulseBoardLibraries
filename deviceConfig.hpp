@@ -29,8 +29,8 @@ class deviceConfig{
         void configMqtt(String mqttUrl,String mqttTopic, uint16_t mqttPort);
         void setSamplePeriod(uint16_t);
         const char* getUrl(void);
-        String getUser(void);
-        String getPassword(void);
+        const char* getUser(void);
+        const char* getPassword(void);
         uint16_t getPort(void);
         const char* getTopic(void);
         uint16_t getSamplePeriod(void);
