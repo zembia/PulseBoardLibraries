@@ -16,6 +16,7 @@
 
 #define GPRS_BAUDRATE         115200
 
+
 #define GPRS_PWRKEY_ON_TIME 550
 
 #define EC25_NET_MODE_PIN 1
@@ -35,7 +36,9 @@ enum class EC25_FLAGS:uint8_t {
     EC25_QPING,
     EC25_QMTOPEN,
     EC25_QMTCONN,
-    EC25_QMTSTAT
+    EC25_QMTSTAT,
+    EC25_QMTSUB,
+    EC25_CBC
 };
 
 
@@ -58,6 +61,8 @@ class quectelEC{
         void            clearWanOperation(void);
         bool            getWanOperation(void);
         bool            getNtpStatus(void);
+        uint16_t        getBattery(void);
+        bool            enableMQTTReceive(void);
 
         
     private:
@@ -90,6 +95,8 @@ class quectelEC{
                 unsigned QMTOPEN:1;
                 unsigned QMTCONN:1;
                 unsigned QMTSTAT:1;
+                unsigned CBC:1;
+                unsigned QMTSUB:1;
             };
             struct 
             {
@@ -113,6 +120,7 @@ class quectelEC{
         bool _gprsConnected;
         
         bool _ntpSyncOk;
+        uint16_t _battery;
 
         TaskHandle_t    _gprsSerialTaskHandle;
         TaskHandle_t    _gprsLoopTaskHandle;

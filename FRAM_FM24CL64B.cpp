@@ -28,7 +28,7 @@ void FRAM_FM24::writeArray(uint16_t address,uint16_t size, uint8_t *data)
         return;
     }
 
-    if (*_i2cMutex != NULL && (xSemaphoreTake(*_i2cMutex, (TickType_t ) 10) == pdTRUE) )
+    if (*_i2cMutex != NULL && (xSemaphoreTake(*_i2cMutex, (TickType_t ) 100) == pdTRUE) )
     {          
         _i2cPort->beginTransmission(_i2cAddr);
         _i2cPort->write((address>>8) &0xFF);
@@ -69,7 +69,7 @@ void FRAM_FM24::readArray(uint16_t address,uint16_t size, uint8_t *data)
         return;
     }
 
-    if (*_i2cMutex != NULL && (xSemaphoreTake(*_i2cMutex, (TickType_t ) 10) == pdTRUE) )
+    if (*_i2cMutex != NULL && (xSemaphoreTake(*_i2cMutex, (TickType_t ) 100) == pdTRUE) )
     {      
         _i2cPort->beginTransmission(_i2cAddr);
         _i2cPort->write((address>>8) &0xFF);

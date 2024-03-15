@@ -2,6 +2,24 @@
 
 const char logtag[] = "QUECTEL";
 
+
+uint16_t quectelEC::getBattery(void)
+{
+    if (xSemaphoreTake(_gprsMutex, (TickType_t ) pdMS_TO_TICKS(300)) == pdTRUE) 
+    {
+        GPRS_Serial.println("AT+CBC");
+        if (_waitResponseWithError(EC25_FLAGS::EC25_CBC,300,true))
+        {
+            ESP_LOGD(logtag,"AT+CBC received");
+        }
+        xSemaphoreGive(_gprsMutex);
+    }
+    
+    return _battery;
+    
+
+}
+
 void quectelEC::_clearFlags(void)
 {
     EC_RESPONSE.w = 0;
@@ -198,6 +216,11 @@ void quectelEC::_process_gprs(char input_data)
 {
     static char _input_buffer[256] = {0};
     static uint16_t counter = 0;
+    static uint8_t QMTSTATE = 0;
+    static uint8_t qmtLenPosition=0;
+    static uint16_t qmtLen = 0;
+    static char *qmtData;
+    static uint16_t mqttDataPointer = 0;
 
     //Buffer de datos de entrada
     if (counter == 255)
@@ -206,17 +229,141 @@ void quectelEC::_process_gprs(char input_data)
     }
     _input_buffer[counter++]   =   input_data;
 
-    //Si se recibe un avanze de linea se procesa el comando
-    if (input_data=='\n')
-    {        
-        _input_buffer[counter]   =   0; //Para terminar la ristra.    
-        ESP_LOGD(logtag,"Received serial: %s",_input_buffer);
-        //Reseteamos el valor de counter, pues no se procesa la misma linea
-        //dos veces
-        counter = 0;
-        //Parseamos el mensaje recibido    
-        _getResponse(_input_buffer);                       
-        _input_buffer[0]   =   0; //Para eliminar la ristra ya procesada        
+    if (counter == 10)
+    {
+        if (strncmp(_input_buffer,"+QMTRECV: ",10) == 0)
+        {
+            ESP_LOGD(logtag,"Receiving QMT DATA:");
+            QMTSTATE = 1;
+        }
+    }
+    
+    switch (QMTSTATE)
+    {
+        //Case 0: no estamos recibiendo un mensaje QMTT
+        case 0:
+            //Si se recibe un avanze de linea se procesa el comando
+            if (input_data=='\n')
+            {        
+                _input_buffer[counter]   =   0; //Para terminar la ristra.    
+                ESP_LOGD(logtag,"Received serial: %s",_input_buffer);
+                //Reseteamos el valor de counter, pues no se procesa la misma linea
+                //dos veces
+                counter = 0;
+                //Parseamos el mensaje recibido    
+                _getResponse(_input_buffer);                       
+                _input_buffer[0]   =   0; //Para eliminar la ristra ya procesada        
+            }
+            break;
+        case 1:
+            //we wait for the first comma
+            if (input_data == ',')
+            {
+                QMTSTATE = 2;
+            }
+            break;
+        case 2:
+            //we wait for the second comma
+            if (input_data == ',')
+            {
+                QMTSTATE = 3;
+            }
+            break;
+        case 3:
+            //we wait for the third comma
+            if (input_data == ',')
+            {
+                qmtLenPosition = counter;
+                QMTSTATE = 4;
+            }
+            break;
+        case 4:
+            //we wait for the fourth comma
+            if (input_data == ',')
+            {
+                qmtLen = atoi(&_input_buffer[qmtLenPosition]);
+                mqttDataPointer = 0;
+                ESP_LOGD(logtag,"MQTT DATA LEN: %d",qmtLen);
+                qmtData = (char*)calloc(qmtLen+1,sizeof(char));
+                if (qmtData == NULL)
+                {
+                    ESP_LOGE(logtag,"Could not allocate enough memory for mqtt data");
+                }
+                QMTSTATE = 5;
+            }
+            break;
+        case 5:
+            //we wait for the " character
+            if (input_data == '\"')
+            {
+                QMTSTATE = 6;
+            }
+            break;
+        case 6:
+            if (qmtData != NULL) qmtData[mqttDataPointer++] = input_data;
+            if (mqttDataPointer == qmtLen)
+            {
+                if (qmtData != NULL)
+                {
+                    qmtData[mqttDataPointer] = 0;
+                    ESP_LOGD(logtag,"MQTT DATA:\r\n%s",qmtData);
+                    free(qmtData);
+                }
+                QMTSTATE = 0;
+                _input_buffer[0]   =   0; //Para eliminar la ristra ya procesada   
+                counter = 0;
+            }
+            
+            break;
+    }
+}
+
+bool quectelEC::enableMQTTReceive(void)
+{
+    if (xSemaphoreTake(_gprsMutex, (TickType_t ) pdMS_TO_TICKS(150000)) == pdTRUE) 
+    {
+        _clearFlags();
+        GPRS_Serial.println("AT+QMTOPEN?");
+        if (_waitResponse(EC25_FLAGS::EC25_OK,300))
+        {
+            ESP_LOGD(logtag,"AT+QMTOPEN OK received");
+        }
+        xSemaphoreGive(_gprsMutex);
+    }
+    else
+    {
+        ESP_LOGE(logtag,"COULD NOT GET SEMAPHORE");
+        return false;
+    }
+    if (_waitResponse(EC25_FLAGS::EC25_QMTOPEN,0))
+    {
+        ESP_LOGI(logtag,"QMT already been opened");
+    }
+    else
+    {
+        ESP_LOGI(logtag,"QMT not opened yet");
+        if (!_configMqttServer())
+        {
+            return false;
+        }
+    }
+
+
+    if (xSemaphoreTake(_gprsMutex, (TickType_t ) pdMS_TO_TICKS(150000)) == pdTRUE) 
+    {
+        _clearFlags();
+        GPRS_Serial.printf("AT+QMTSUB=0,1,\"%s\",1\r\n",_pulseConfiguration->getTopic());
+        ESP_LOGI(logtag,"AT+QMTSUB=0,1,\"%s\",1\r\n",_pulseConfiguration->getTopic());
+        if (_waitResponse(EC25_FLAGS::EC25_OK,300))
+        {
+            ESP_LOGD(logtag,"AT+QMTSUB received");
+        }
+        xSemaphoreGive(_gprsMutex);
+    }
+    else
+    {
+        ESP_LOGE(logtag,"COULD NOT GET SEMAPHORE");
+        return false;
     }
 }
 
@@ -320,6 +467,8 @@ void quectelEC::powerUp(void)
     {
         ESP_LOGD(logtag,"AT+CMEE=2 OK received");
     }
+
+    //GPRS_Serial.println("AT+IPR=115200;&W");
     _gprsInitDone = true;
 
 
@@ -511,6 +660,21 @@ uint8_t quectelEC::_waitResponseWithError(EC25_FLAGS RESPONSE,uint16_t milliseco
                     EC_RESPONSE.QMTSTAT = 0;
                     return 1;
                 }
+                break;
+            case EC25_FLAGS::EC25_CBC:
+                if (EC_RESPONSE.CBC)
+                {
+                    EC_RESPONSE.CBC = 0;
+                    return 1;
+                }
+                break;
+            case EC25_FLAGS::EC25_QMTSUB:
+                if (EC_RESPONSE.QMTSUB)
+                {
+                    EC_RESPONSE.QMTSUB = 0;
+                    return 1;
+                }
+                break;
             default:
                 break;
         }
@@ -541,45 +705,55 @@ void quectelEC::_getResponse(char *PTR)
     if (strncmp(PTR,"ERROR",5)==0)
     {
         EC_RESPONSE.ERROR   =   1;
+        return;
+
     }
     if (strncmp(PTR,"+CME ERROR",10)==0)
     {
         EC_RESPONSE.ERROR   =   1;
+        return;
     }
     if (strncmp(PTR,"CONNECT",7)==0)
     {
         EC_RESPONSE.CONNECT   =   1;
+        return;
     }
     if (strncmp(PTR,"RDY",3)==0)
     {
         EC_RESPONSE.RDY   =   1;
+        return;
     }
     if (strncmp(PTR,"+CGREG: 0,",10) == 0)
     {
         EC_RESPONSE.CGREG = 1;
         _lastCode = atoi(&PTR[10]);
+        return;
     }
 
     if (strncmp(PTR,"+QHTTPPOST: 0,",14) == 0)
     {
         EC_RESPONSE.QHTTPPOST = 1;
         _lastCode = atoi(&PTR[14]);
+        return;
     }
 
     if (strncmp(PTR,"+QMTOPEN: 0,",12) == 0)
     {
         EC_RESPONSE.QMTOPEN = 1;
         _lastCode = atoi(&PTR[12]);
+        return;
     }
 
     if (strncmp(PTR,"+QPING: 0,",10) == 0)
     {
         EC_RESPONSE.QPING = 1; 
+        return;
     }
 
     if (strncmp(PTR,"+QMTCONN: 0,0,0,",15) == 0)        
     {
         EC_RESPONSE.QMTCONN = 1;
+        return;
     }
     if (strncmp(PTR,"+QMTSTAT: 0,",12) == 0)
     {
@@ -589,6 +763,7 @@ void quectelEC::_getResponse(char *PTR)
         {
             _mqttServerOpen = false;
         }
+        return;
 
     }
     if (strncmp(PTR,"+QIACT:",7 ) == 0)
@@ -612,6 +787,15 @@ void quectelEC::_getResponse(char *PTR)
         token = strtok(NULL,":,\""); if (token == NULL) return;
         _deviceContexts[PDPContextId].ip.fromString(token);
     }
+    if (strncmp(PTR,"+CBC: ",6) == 0 )
+    {
+        token = strtok(&PTR[6],","); if (token == NULL) return;
+        token = strtok(NULL,","); if (token == NULL) return;
+        token = strtok(NULL,","); if (token == NULL) return;
+        _battery = atoi(token);
+        EC_RESPONSE.CBC = 1;
+    }
+
     if (strncmp(PTR,"+QNTP: ",7)==0)
     {
         _ntpSyncOk = false;
@@ -1067,8 +1251,30 @@ bool quectelEC::_configMqttServer(void)
 
     if (xSemaphoreTake(_gprsMutex, (TickType_t ) pdMS_TO_TICKS(10000)) == pdTRUE) 
     {
+        //First we check if the QMT is open
+         _clearFlags();  
+        ESP_LOGD(logtag,"AT+QMTOPEN?");
+        GPRS_Serial.println("AT+QMTOPEN?");
+        if (_waitResponseWithError(EC25_FLAGS::EC25_OK,300,true))
+        {
+            ESP_LOGI(logtag,"AT+QMTOPEN? OK received");
+        }
+        if (EC_RESPONSE.QMTOPEN)
+        {
+            ESP_LOGD(logtag,"AT+QMTCLOSE=0");
+            GPRS_Serial.println("AT+QMTCLOSE=0");
+
+            if (_waitResponseWithError(EC25_FLAGS::EC25_OK,300,true))
+            {
+                ESP_LOGI(logtag,"AT+QMTCLOSE OK received");
+            }
+            xSemaphoreGive(_gprsMutex);
+            return false;
+        }
+
         _clearFlags();       
-        GPRS_Serial.println("AT+QMTCFG=\"recv/mode\",0,1,0");
+        ESP_LOGD(logtag,"AT+QMTCFG=\"recv/mode\",0,0,1");
+        GPRS_Serial.println("AT+QMTCFG=\"recv/mode\",0,0,1");
         if (_waitResponse(EC25_FLAGS::EC25_OK,300))
         {
             ESP_LOGI(logtag,"AT+QMTCFG OK received");
@@ -1081,6 +1287,7 @@ bool quectelEC::_configMqttServer(void)
 
         _clearFlags();
         
+        ESP_LOGD(logtag,"AT+QMTOPEN=0,\"%s\",%d\r\n",_pulseConfiguration->getUrl(),_pulseConfiguration->getPort());
         GPRS_Serial.printf("AT+QMTOPEN=0,\"%s\",%d\r\n",_pulseConfiguration->getUrl(),_pulseConfiguration->getPort());
         if (_waitResponseWithError(EC25_FLAGS::EC25_QMTOPEN,120000,true))
         {
@@ -1100,6 +1307,7 @@ bool quectelEC::_configMqttServer(void)
         }
 
         _clearFlags();
+        ESP_LOGD(logtag,"AT+QMTCONN=0,\"TESTZEMBIA\",\"%s\",\"%s\"\r\n",_pulseConfiguration->getUser(),_pulseConfiguration->getPassword());
         GPRS_Serial.printf("AT+QMTCONN=0,\"TESTZEMBIA\",\"%s\",\"%s\"\r\n",_pulseConfiguration->getUser(),_pulseConfiguration->getPassword());
         
         if (_waitResponseWithError(EC25_FLAGS::EC25_QMTCONN,5000,true))
@@ -1119,6 +1327,7 @@ bool quectelEC::_configMqttServer(void)
     {
         return false;
     }
+    _mqttServerOpen = true;
     return true;
 }
 
@@ -1144,15 +1353,11 @@ bool quectelEC::postMqttMsg(String jsonData)
         {
             return false;
         }
-        else
-        {
-            _mqttServerOpen = true;
-        }
     }
     if (xSemaphoreTake(_gprsMutex, (TickType_t ) pdMS_TO_TICKS(10000)) == pdTRUE) 
     {
         _clearFlags();       
-        GPRS_Serial.printf("AT+QMTPUBEX=0,0,0,0,\"%s\",%d\r\n",_pulseConfiguration->getTopic(),jsonData.length());
+        GPRS_Serial.printf("AT+QMTPUBEX=0,1,2,0,\"%s\",%d\r\n",_pulseConfiguration->getTopic(),jsonData.length());
         //we need to wait for a single >
         vTaskDelay(10);
         GPRS_Serial.print(jsonData);
@@ -1162,7 +1367,18 @@ bool quectelEC::postMqttMsg(String jsonData)
         }
         else
         {
-            _mqttServerOpen = false;
+            _clearFlags();
+            ESP_LOGD(logtag,"AT+QMTOPEN?");
+            GPRS_Serial.println("AT+QMTOPEN?");
+            if (_waitResponseWithError(EC25_FLAGS::EC25_OK,300,true))
+            {
+                ESP_LOGI(logtag,"AT+QMTOPEN? OK received");
+            }
+            if (EC_RESPONSE.QMTOPEN == 0)
+            {
+                _mqttServerOpen = false;
+
+            }            
             xSemaphoreGive(_gprsMutex);
             return false;
         }
