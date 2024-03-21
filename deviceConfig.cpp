@@ -12,6 +12,9 @@ deviceConfig::deviceConfig(void)
     //We refresh other general preferences
     _refreshGeneralConfig();
 
+    //We refresh APN configurations
+    _refreshApnConfig();
+
 }
 
 void deviceConfig::_refreshCredentials(void)
@@ -19,6 +22,46 @@ void deviceConfig::_refreshCredentials(void)
     _preferences.begin("credentials",false); 
     _user = _preferences.getString("user",""); //default value is ""
     _password = _preferences.getString("password",""); //default value is ""
+    _preferences.end();
+}
+
+void deviceConfig::_refreshApnConfig(void)
+{
+    _preferences.begin("simconfig",false);
+    _apn = _preferences.getString("apn","data.mono");
+    _apn_user = _preferences.getString("user","");
+    _apn_password = _preferences.getString("password","");
+    _apnAuthMethod = _preferences.getShort("auth",1);
+    _preferences.end();
+}
+
+const char * deviceConfig::getAPN(void)
+{
+    return _apn.c_str();
+}
+
+const char *deviceConfig::getApnPassword(void)
+{
+    return _apn_password.c_str();
+}
+
+const char *deviceConfig::getApnUser(void)
+{
+    return _apn_user.c_str();
+}
+uint8_t deviceConfig::getApnAuth(void)
+{
+    return _apnAuthMethod;
+}
+
+void deviceConfig::configAPN(String APN,String user, String Password, uint8_t ApnAuth)
+{
+    ESP_LOGI("configAPN","New configuration. APN: %s",APN.c_str());
+    _preferences.begin("simconfig",false);
+    _preferences.putString("apn",APN);
+    _preferences.putString("user",user);
+    _preferences.putString("password",Password);
+    _preferences.putShort("auth",ApnAuth);
     _preferences.end();
 }
 
@@ -106,7 +149,7 @@ pulseIoPort::pulseIoPort(uint32_t portNumber, pulseIoType type,PCAL9535A::PCAL95
     _i2cMutex = &i2cMutex;    
     if (_varDataType == pulseInput)
     {
-        if (xSemaphoreTake(*_i2cMutex, (TickType_t ) 5) == pdTRUE) 
+        if (xSemaphoreTake(*_i2cMutex, (TickType_t ) 100) == pdTRUE) 
         {
             //1 salida, 0 entrada
             _gpio->pinMode(_port,0);
@@ -115,7 +158,7 @@ pulseIoPort::pulseIoPort(uint32_t portNumber, pulseIoType type,PCAL9535A::PCAL95
     }
     else
     {
-        if (xSemaphoreTake(*_i2cMutex, (TickType_t ) 5) == pdTRUE) 
+        if (xSemaphoreTake(*_i2cMutex, (TickType_t ) 100) == pdTRUE) 
         {
             //1 salida, 0 entrada
             _gpio->pinMode(_port,1);
@@ -129,7 +172,7 @@ bool pulseIoPort::getPortValue(void)
     bool readData;
     if(_varDataType == pulseInput)
     {
-         if (xSemaphoreTake(*_i2cMutex, (TickType_t ) 5) == pdTRUE) 
+         if (xSemaphoreTake(*_i2cMutex, (TickType_t ) 100) == pdTRUE) 
         {
             readData = _gpio->digitalRead(_port);
             xSemaphoreGive(*_i2cMutex);
@@ -144,7 +187,7 @@ void pulseIoPort::setPortValue(bool inputData)
 {
     if (_varDataType == pulseOutput)
     {
-        if (xSemaphoreTake(*_i2cMutex, (TickType_t ) 5) == pdTRUE) 
+        if (xSemaphoreTake(*_i2cMutex, (TickType_t ) 100) == pdTRUE) 
         {
             _gpio->digitalWrite(_port,inputData);
             xSemaphoreGive(*_i2cMutex);

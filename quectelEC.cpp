@@ -28,9 +28,31 @@ bool quectelEC::isConnected(void)
 {
     return _gprsConnected;
 }
+
+
+bool quectelEC::_getImei(void)
+{
+    _clearFlags();
+    if (xSemaphoreTake(_gprsMutex, (TickType_t ) pdMS_TO_TICKS(300)) == pdTRUE) 
+    {
+        GPRS_Serial.println("AT+GSN");
+        if (_waitResponseWithError(EC25_FLAGS::EC25_OK,300,true))
+        {
+            strcpy(_Imei,_temptingImei);
+            ESP_LOGD(logtag,"AT+GSN received. IMEI: %s",_Imei);
+        }
+        xSemaphoreGive(_gprsMutex);
+    }
+    else
+    {
+        return false;
+    }
+    return true;
+}
 quectelEC::quectelEC(PCAL9535A::PCAL9535A<TwoWire> &gpio,SemaphoreHandle_t &i2cMutex)
 {
 
+    _battery = 0;
     _gpio = &gpio;
     _i2cMutex = &i2cMutex;
     _rebootingGprs = false;
@@ -144,7 +166,8 @@ void quectelEC::_gprsConnectionLoop(void)
                 
                 //configure parameters of TCP/IP context
                 //GPRS_Serial.println("AT+QICSGP=1,1,\"\",\"\" ,\"\" ,1");
-                GPRS_Serial.printf("AT+QICSGP=1,1,\"%s\",\"\" ,\"\" ,1\r\n",APN_STRING);
+                ESP_LOGD(logtag,"AT+QICSGP=1,1,\"%s\",\"%s\" ,\"%s\" ,%u\r\n",_pulseConfiguration->getAPN(),_pulseConfiguration->getApnUser(),_pulseConfiguration->getApnPassword(),_pulseConfiguration->getApnAuth());
+                GPRS_Serial.printf("AT+QICSGP=1,1,\"%s\",\"%s\" ,\"%s\" ,%u\r\n",_pulseConfiguration->getAPN(),_pulseConfiguration->getApnUser(),_pulseConfiguration->getApnPassword(),_pulseConfiguration->getApnAuth());
                 if (_waitResponse(EC25_FLAGS::EC25_OK,300))
                 {
                     ESP_LOGI(logtag,"QICSGP OK received");
@@ -229,6 +252,12 @@ void quectelEC::_process_gprs(char input_data)
     }
     _input_buffer[counter++]   =   input_data;
 
+
+    if (input_data == '>')
+    {
+        EC_RESPONSE.ARROW = 1;
+    }
+    //Special cases
     if (counter == 10)
     {
         if (strncmp(_input_buffer,"+QMTRECV: ",10) == 0)
@@ -237,7 +266,12 @@ void quectelEC::_process_gprs(char input_data)
             QMTSTATE = 1;
         }
     }
-    
+
+    if (counter ==15)
+    {
+        strncpy(_temptingImei,_input_buffer,15);
+        _temptingImei[15] = 0;
+    }
     switch (QMTSTATE)
     {
         //Case 0: no estamos recibiendo un mensaje QMTT
@@ -318,6 +352,11 @@ void quectelEC::_process_gprs(char input_data)
     }
 }
 
+bool quectelEC::getInitStatus(void)
+{
+    return _gprsInitDone;
+}
+
 bool quectelEC::enableMQTTReceive(void)
 {
     if (xSemaphoreTake(_gprsMutex, (TickType_t ) pdMS_TO_TICKS(150000)) == pdTRUE) 
@@ -384,7 +423,7 @@ void quectelEC::powerUp(void)
     {
         ESP_LOGE(logtag, "ERROR, i2cMutex is not initialized");
     }
-    if (xSemaphoreTake(*_i2cMutex, (TickType_t ) 5) == pdTRUE) 
+    if (xSemaphoreTake(*_i2cMutex, (TickType_t ) 100) == pdTRUE) 
     {
         ESP_LOGD(logtag,"Setting EC25_NET_MODE_PIN PinMode");
         _gpio->pinMode(EC25_NET_MODE_PIN,1);
@@ -415,7 +454,7 @@ void quectelEC::powerUp(void)
         {
             ESP_LOGD(logtag,"GPRS Powered on");
             
-            if (xSemaphoreTake(*_i2cMutex, (TickType_t ) 5) == pdTRUE) 
+            if (xSemaphoreTake(*_i2cMutex, (TickType_t )100) == pdTRUE) 
             {
                 _gpio->pinMode(EC25_NET_MODE_PIN,0);
                 xSemaphoreGive(*_i2cMutex);
@@ -468,6 +507,8 @@ void quectelEC::powerUp(void)
         ESP_LOGD(logtag,"AT+CMEE=2 OK received");
     }
 
+    _getImei();
+
     //GPRS_Serial.println("AT+IPR=115200;&W");
     _gprsInitDone = true;
 
@@ -507,6 +548,7 @@ void quectelEC::powerDownGPRS(void)
 
 bool quectelEC::_checkCreg(void)
 {
+    static bool lastConnStatus = false;
     ESP_LOGD(logtag,"checking CREG");
     if (_rebootingGprs) return 0;
     _clearFlags();
@@ -522,7 +564,7 @@ bool quectelEC::_checkCreg(void)
     }
     else
     {
-        return false;
+        return lastConnStatus;
     }
 
     _clearFlags();
@@ -530,7 +572,8 @@ bool quectelEC::_checkCreg(void)
     if ((_lastCode==5) || (_lastCode == 1))
     {
         ESP_LOGI(logtag,"REGISTERED IN NETWORK. CREG %d",_lastCode);
-        return true;
+        lastConnStatus = true;
+        
     }
     else
     {
@@ -542,8 +585,9 @@ bool quectelEC::_checkCreg(void)
         {
             ESP_LOGE(logtag, "Registrando. CREG: %d",_lastCode);
         }
-        return false;
+        lastConnStatus = false;
     }
+    return lastConnStatus;
 }
 
 /********************FUNCION wait_response***********************/
@@ -675,6 +719,18 @@ uint8_t quectelEC::_waitResponseWithError(EC25_FLAGS RESPONSE,uint16_t milliseco
                     return 1;
                 }
                 break;
+            case EC25_FLAGS::EC25_ARROW:
+                if (EC_RESPONSE.ARROW)
+                {
+                    EC_RESPONSE.ARROW = 0;
+                    return 1;
+                }
+            case EC25_FLAGS::EC25_QMTPUBEX:
+                if (EC_RESPONSE.QMTPUBEX)
+                {
+                    EC_RESPONSE.QMTPUBEX = 0;
+                    return 1;
+                }
             default:
                 break;
         }
@@ -794,6 +850,12 @@ void quectelEC::_getResponse(char *PTR)
         token = strtok(NULL,","); if (token == NULL) return;
         _battery = atoi(token);
         EC_RESPONSE.CBC = 1;
+    }
+
+    if (strncmp(PTR,"+QMTPUBEX: 0,1,0",16) == 0)
+    {
+        EC_RESPONSE.QMTPUBEX = 1;
+        return;
     }
 
     if (strncmp(PTR,"+QNTP: ",7)==0)
@@ -1010,7 +1072,7 @@ void quectelEC::reset(void)
     _failedPosts = 0;
 
     
-    if (xSemaphoreTake(*_i2cMutex, (TickType_t ) 5) == pdTRUE) 
+    if (xSemaphoreTake(*_i2cMutex, (TickType_t ) 100) == pdTRUE) 
     {
         _gpio->pinMode(EC25_NET_MODE_PIN,1);
         _gpio->digitalWrite(EC25_NET_MODE_PIN,LOW);
@@ -1255,7 +1317,7 @@ bool quectelEC::_configMqttServer(void)
          _clearFlags();  
         ESP_LOGD(logtag,"AT+QMTOPEN?");
         GPRS_Serial.println("AT+QMTOPEN?");
-        if (_waitResponseWithError(EC25_FLAGS::EC25_OK,300,true))
+        if (_waitResponseWithError(EC25_FLAGS::EC25_OK,1000,true))
         {
             ESP_LOGI(logtag,"AT+QMTOPEN? OK received");
         }
@@ -1264,7 +1326,7 @@ bool quectelEC::_configMqttServer(void)
             ESP_LOGD(logtag,"AT+QMTCLOSE=0");
             GPRS_Serial.println("AT+QMTCLOSE=0");
 
-            if (_waitResponseWithError(EC25_FLAGS::EC25_OK,300,true))
+            if (_waitResponseWithError(EC25_FLAGS::EC25_OK,30000,true))
             {
                 ESP_LOGI(logtag,"AT+QMTCLOSE OK received");
             }
@@ -1307,9 +1369,11 @@ bool quectelEC::_configMqttServer(void)
         }
 
         _clearFlags();
-        ESP_LOGD(logtag,"AT+QMTCONN=0,\"TESTZEMBIA\",\"%s\",\"%s\"\r\n",_pulseConfiguration->getUser(),_pulseConfiguration->getPassword());
-        GPRS_Serial.printf("AT+QMTCONN=0,\"TESTZEMBIA\",\"%s\",\"%s\"\r\n",_pulseConfiguration->getUser(),_pulseConfiguration->getPassword());
-        
+        /*ESP_LOGD(logtag,"AT+QMTCONN=0,\"%s\",\"%s\",\"%s\"\r\n",_Imei,_pulseConfiguration->getUser(),_pulseConfiguration->getPassword());
+        GPRS_Serial.printf("AT+QMTCONN=0,\"%s\",\"%s\",\"%s\"\r\n",_Imei,_pulseConfiguration->getUser(),_pulseConfiguration->getPassword());
+        */
+        ESP_LOGD(logtag,"AT+QMTCONN=0,\"%s\",\"%s\",\"%s\"\r\n","TESTZEMBIA",_pulseConfiguration->getUser(),_pulseConfiguration->getPassword());
+        GPRS_Serial.printf("AT+QMTCONN=0,\"%s\",\"%s\",\"%s\"\r\n","TESTZEMBIA",_pulseConfiguration->getUser(),_pulseConfiguration->getPassword());
         if (_waitResponseWithError(EC25_FLAGS::EC25_QMTCONN,5000,true))
         {
             ESP_LOGI(logtag,"+QMTCONN received");
@@ -1357,11 +1421,19 @@ bool quectelEC::postMqttMsg(String jsonData)
     if (xSemaphoreTake(_gprsMutex, (TickType_t ) pdMS_TO_TICKS(10000)) == pdTRUE) 
     {
         _clearFlags();       
-        GPRS_Serial.printf("AT+QMTPUBEX=0,1,2,0,\"%s\",%d\r\n",_pulseConfiguration->getTopic(),jsonData.length());
+        ESP_LOGD(logtag,"AT+QMTPUBEX=0,1,2,0,\"%s\",%u\r\n",_pulseConfiguration->getTopic(),jsonData.length());
+        GPRS_Serial.printf("AT+QMTPUBEX=0,1,2,0,\"%s\",%u\r\n",_pulseConfiguration->getTopic(),jsonData.length());
         //we need to wait for a single >
-        vTaskDelay(10);
-        GPRS_Serial.print(jsonData);
-        if (_waitResponseWithError(EC25_FLAGS::EC25_OK,15000,true))
+        _clearFlags();
+        if (_waitResponseWithError(EC25_FLAGS::EC25_ARROW,15000,true))
+        {
+            ESP_LOGI(logtag,"> received");
+        }
+
+        
+        ESP_LOGD(logtag,"%s",jsonData.c_str());
+        GPRS_Serial.print(jsonData.c_str());
+        if (_waitResponseWithError(EC25_FLAGS::EC25_QMTPUBEX,15000,true))
         {
             ESP_LOGI(logtag,"AT+QMTPUBEX OK received");
         }
@@ -1370,7 +1442,7 @@ bool quectelEC::postMqttMsg(String jsonData)
             _clearFlags();
             ESP_LOGD(logtag,"AT+QMTOPEN?");
             GPRS_Serial.println("AT+QMTOPEN?");
-            if (_waitResponseWithError(EC25_FLAGS::EC25_OK,300,true))
+            if (_waitResponseWithError(EC25_FLAGS::EC25_OK,1000,true))
             {
                 ESP_LOGI(logtag,"AT+QMTOPEN? OK received");
             }
@@ -1384,6 +1456,7 @@ bool quectelEC::postMqttMsg(String jsonData)
         }
         xSemaphoreGive(_gprsMutex);
     }
+     _wanOperation = true;
     return true;
 }
 

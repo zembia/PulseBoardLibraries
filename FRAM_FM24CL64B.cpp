@@ -8,24 +8,25 @@ FRAM_FM24::FRAM_FM24(SemaphoreHandle_t &i2cMutex,TwoWire &port,uint8_t address)
     
 }
 
-void FRAM_FM24::writeArray(uint16_t address,uint16_t size, uint8_t *data)
+bool FRAM_FM24::writeArray(uint16_t address,uint16_t size, uint8_t *data)
 {
+    bool result = true;
     //input validation
     if (size == 0)
     {
         ESP_LOGE("FRAM", "SIZE IS 0");
-        return;
+        return false;
     }
     if (data == NULL)
     {
         ESP_LOGE("FRAM", "DATA POINTER IS NULL");
-        return;
+        return false;
     }
     //data too big
     if (address+(uint16_t)size>=MAX_ADDRESS)
     {
         ESP_LOGE("FRAM", "ADDRESS IS TO BIG");
-        return;
+        return false;
     }
 
     if (*_i2cMutex != NULL && (xSemaphoreTake(*_i2cMutex, (TickType_t ) 100) == pdTRUE) )
@@ -37,7 +38,10 @@ void FRAM_FM24::writeArray(uint16_t address,uint16_t size, uint8_t *data)
         {
             _i2cPort->write(data[i]);
         }
-        _i2cPort->endTransmission();
+        if (0 != _i2cPort->endTransmission())
+        {
+            result = false;
+        }
         
         xSemaphoreGive(*_i2cMutex);
 
@@ -45,28 +49,31 @@ void FRAM_FM24::writeArray(uint16_t address,uint16_t size, uint8_t *data)
     else
     {
         ESP_LOGE("FRAM", "Could not take semaphore");
+        return false;
     }
+    return result;
 
 }
 
-void FRAM_FM24::readArray(uint16_t address,uint16_t size, uint8_t *data)
+bool FRAM_FM24::readArray(uint16_t address,uint16_t size, uint8_t *data)
 {
+    bool result = true;
     //input validation
     if (size == 0)
     {
         ESP_LOGE("FRAM", "SIZE IS 0");
-        return;
+        return false;
     }
     if (data == NULL)
     {
         ESP_LOGE("FRAM", "DATA POINTER IS NULL");
-        return;
+        return false;
     }
     //data too big
     if (address+(uint16_t)size>=MAX_ADDRESS)
     {
         ESP_LOGE("FRAM", "ADDRESS IS TO BIG");
-        return;
+        return false;
     }
 
     if (*_i2cMutex != NULL && (xSemaphoreTake(*_i2cMutex, (TickType_t ) 100) == pdTRUE) )
@@ -74,7 +81,10 @@ void FRAM_FM24::readArray(uint16_t address,uint16_t size, uint8_t *data)
         _i2cPort->beginTransmission(_i2cAddr);
         _i2cPort->write((address>>8) &0xFF);
         _i2cPort->write((address) &0xFF);
-        _i2cPort->endTransmission(false);
+        if (0 !=  _i2cPort->endTransmission(false))
+        {
+            result = false;
+        }
         _i2cPort->requestFrom(_i2cAddr,size,true);
 
 
@@ -88,7 +98,9 @@ void FRAM_FM24::readArray(uint16_t address,uint16_t size, uint8_t *data)
     else
     {
         ESP_LOGE("FRAM", "Could not take semaphore");
+        return false;
     }
+    return result;
 }
 
 #define LEN_TO_TEST 64

@@ -38,7 +38,17 @@ enum class EC25_FLAGS:uint8_t {
     EC25_QMTCONN,
     EC25_QMTSTAT,
     EC25_QMTSUB,
-    EC25_CBC
+    EC25_CBC,
+    EC25_ARROW,
+    EC25_QMTPUBEX
+};
+
+enum class QUECTEL_AUTH_METHOD:uint8_t
+{
+    NONE=0,
+    PAP,
+    CHAP,
+    PAP_OR_CHAP
 };
 
 
@@ -63,6 +73,7 @@ class quectelEC{
         bool            getNtpStatus(void);
         uint16_t        getBattery(void);
         bool            enableMQTTReceive(void);
+        bool            getInitStatus(void);
 
         
     private:
@@ -80,6 +91,7 @@ class quectelEC{
         void            _getResponse(char *PTR);
         bool            _checkSecondaryContext(void);        
         bool            _configMqttServer(void);
+        bool            _getImei(void);
         
 
         union QUECTEL_RESPONSE{
@@ -97,6 +109,8 @@ class quectelEC{
                 unsigned QMTSTAT:1;
                 unsigned CBC:1;
                 unsigned QMTSUB:1;
+                unsigned ARROW:1;
+                unsigned QMTPUBEX:1;
             };
             struct 
             {
@@ -132,6 +146,8 @@ class quectelEC{
         bool            _mqttServerOpen;
         uint16_t        _failedPosts;
         deviceConfig    *_pulseConfiguration;
+        char            _temptingImei[16];
+        char            _Imei[16];
 
         void (*_postNtpSync)();
 };

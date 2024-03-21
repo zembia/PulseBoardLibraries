@@ -34,6 +34,11 @@ class deviceConfig{
         uint16_t getPort(void);
         const char* getTopic(void);
         uint16_t getSamplePeriod(void);
+        const char* getAPN(void);
+        const char* getApnPassword(void);
+        const char* getApnUser(void);
+        uint8_t getApnAuth(void);
+        void configAPN(String APN,String user, String Password, uint8_t ApnAuth);
     private:
         String      _user;
         String      _password;
@@ -41,10 +46,15 @@ class deviceConfig{
         uint16_t    _samplePeriod;
         String      _mqttUrl;
         String      _mqttTopic;
+        String      _apn;
+        String      _apn_user;
+        String      _apn_password;
+        uint8_t     _apnAuthMethod;
         uint16_t    _mqttPort;
         void        _refreshCredentials(void);
         void        _refreshMqtt(void);
         void        _refreshGeneralConfig(void);
+        void        _refreshApnConfig(void);
 };
 
 
