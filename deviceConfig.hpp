@@ -12,7 +12,11 @@ enum pulseIoType {
     pulseOutput
 };
 
-
+enum class POST_METHOD:uint8_t {
+    NONE,
+    HTTP_POST,
+    MQTT
+};
 
 enum pulseFilterType{
     FILTER_50,
@@ -27,6 +31,7 @@ class deviceConfig{
         deviceConfig(void);
         void setCredentials(String user, String password);
         void configMqtt(String mqttUrl,String mqttTopic, uint16_t mqttPort);
+        void configHttp(String httpUrl);
         void setSamplePeriod(uint16_t);
         const char* getUrl(void);
         const char* getUser(void);
@@ -39,20 +44,27 @@ class deviceConfig{
         const char* getApnUser(void);
         uint8_t getApnAuth(void);
         void configAPN(String APN,String user, String Password, uint8_t ApnAuth);
+        void setPostMethod(POST_METHOD method);
+        POST_METHOD getCurrentMethod(void);
+
     private:
         String      _user;
         String      _password;
         Preferences _preferences;
         uint16_t    _samplePeriod;
         String      _mqttUrl;
+        String      _httpUrl;
         String      _mqttTopic;
         String      _apn;
         String      _apn_user;
         String      _apn_password;
         uint8_t     _apnAuthMethod;
         uint16_t    _mqttPort;
+        POST_METHOD _postMethod;
+
         void        _refreshCredentials(void);
         void        _refreshMqtt(void);
+        void        _refreshHttp(void);
         void        _refreshGeneralConfig(void);
         void        _refreshApnConfig(void);
 };

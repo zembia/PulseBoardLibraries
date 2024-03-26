@@ -730,7 +730,7 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
   //3.6 ms at 9600 or 2ms at 19200 is met
 
   
-  delay(2);//so we delayed the minimum between the 2 miliseconds
+  vTaskDelay(pdMS_TO_TICKS(2));//so we delayed the minimum between the 2 miliseconds
 
   while (_serial->available() != 0)
   {

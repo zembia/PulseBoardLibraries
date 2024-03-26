@@ -8,6 +8,7 @@ deviceConfig::deviceConfig(void)
 
     //Now we get mqtt Preferences
     _refreshMqtt();
+    _refreshHttp();
 
     //We refresh other general preferences
     _refreshGeneralConfig();
@@ -63,8 +64,17 @@ void deviceConfig::configAPN(String APN,String user, String Password, uint8_t Ap
     _preferences.putString("password",Password);
     _preferences.putShort("auth",ApnAuth);
     _preferences.end();
+    _refreshApnConfig();
 }
 
+
+void deviceConfig::configHttp(String httpUrl)
+{
+    _preferences.begin("http",false);
+    _preferences.putString("url",httpUrl);
+    _preferences.end();
+    _refreshHttp();
+}
 void deviceConfig::configMqtt(String mqttUrl,String mqttTopic, uint16_t mqttPort)
 {
     _preferences.begin("mqtt",false);
@@ -72,11 +82,24 @@ void deviceConfig::configMqtt(String mqttUrl,String mqttTopic, uint16_t mqttPort
     _preferences.putString("topic",mqttTopic);
     _preferences.putString("url",mqttUrl);
     _preferences.end();
+    _refreshMqtt();
 }
 
 const char *deviceConfig::getUrl(void)
 {
-    return _mqttUrl.c_str();
+    if (_postMethod == POST_METHOD::HTTP_POST)
+    {
+        return _httpUrl.c_str();
+    }
+    if (_postMethod == POST_METHOD::MQTT)
+    {
+        return _mqttUrl.c_str();
+    }
+    else
+    {
+        return "";
+    }
+    
 }
 uint16_t deviceConfig::getPort(void)
 {
@@ -101,10 +124,30 @@ void deviceConfig::_refreshMqtt(void)
     _preferences.end();
 }
 
+void deviceConfig::_refreshHttp(void)
+{
+    _preferences.begin("http",false); 
+    _httpUrl    = _preferences.getString("url","");
+    _preferences.end();
+}
+
+void deviceConfig::setPostMethod(POST_METHOD method)
+{
+    _preferences.begin("generalConfig",false);
+    _preferences.putUChar("postMethod",(uint8_t)(method));
+    _preferences.end();
+    _refreshGeneralConfig();
+}
+
+POST_METHOD deviceConfig::getCurrentMethod(void)
+{
+    return _postMethod;
+}
 void deviceConfig::_refreshGeneralConfig(void)
 {
     _preferences.begin("generalConfig",false);
     _samplePeriod = _preferences.getUShort("samplePeriod",60);
+    _postMethod = (POST_METHOD)_preferences.getUChar("postMethod",(uint8_t)(POST_METHOD::NONE));
     _preferences.end();
 }
 
@@ -116,6 +159,7 @@ void deviceConfig::setSamplePeriod(uint16_t samplePeriod)
         _preferences.putUShort("samplePeriod",samplePeriod);
         _preferences.end();
     }
+    _refreshGeneralConfig();
 }
 const char *deviceConfig::getUser(void)
 {

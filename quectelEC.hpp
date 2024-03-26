@@ -60,7 +60,6 @@ class quectelEC{
         bool            isConnected(void);
         bool            pingServer(const char*, uint8_t, uint8_t);
         void            reset(void);
-        uint16_t        postData(const char *server, const char *payload);
         uint8_t         syncNtpServer(const char *server, uint8_t port);
         void            postNtpSync(void (*)());
         uint16_t        jsonHttpPost(const char *server, const char *payload);
