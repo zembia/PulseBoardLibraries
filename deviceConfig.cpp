@@ -148,6 +148,7 @@ void deviceConfig::_refreshGeneralConfig(void)
     _preferences.begin("generalConfig",false);
     _samplePeriod = _preferences.getUShort("samplePeriod",60);
     _postMethod = (POST_METHOD)_preferences.getUChar("postMethod",(uint8_t)(POST_METHOD::NONE));
+    _customName = _preferences.getString("name","pulse board");
     _preferences.end();
 }
 
@@ -160,6 +161,20 @@ void deviceConfig::setSamplePeriod(uint16_t samplePeriod)
         _preferences.end();
     }
     _refreshGeneralConfig();
+}
+const char* deviceConfig::getCustomName(void)
+{
+    return _customName.c_str();
+}
+void deviceConfig::setCustomName(String name)
+{
+    if (name.length()>0)
+    {
+        _preferences.begin("generalConfig",false);
+        _preferences.putString("name",name);
+        _preferences.end(); //close preferences
+        _refreshGeneralConfig();
+    }
 }
 const char *deviceConfig::getUser(void)
 {

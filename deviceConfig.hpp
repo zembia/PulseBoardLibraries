@@ -46,6 +46,8 @@ class deviceConfig{
         void configAPN(String APN,String user, String Password, uint8_t ApnAuth);
         void setPostMethod(POST_METHOD method);
         POST_METHOD getCurrentMethod(void);
+        void setCustomName(String name);
+        const char* getCustomName(void);
 
     private:
         String      _user;
@@ -58,6 +60,7 @@ class deviceConfig{
         String      _apn;
         String      _apn_user;
         String      _apn_password;
+        String      _customName;
         uint8_t     _apnAuthMethod;
         uint16_t    _mqttPort;
         POST_METHOD _postMethod;
