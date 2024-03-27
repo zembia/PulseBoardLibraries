@@ -41,11 +41,21 @@ modbusVariable::modbusVariable(uint16_t address, modbusDataType varDataType, con
     ESP_LOGI("MODBUS_MULTI_DEV","MODBUS VARIABLE CREATED CORRECTLY");
 }
 
+
 void modbusVariable::setModbusHandle(ModbusMaster *modbusReader)
 {
     _modbusReader = modbusReader;
 }
 
+float modbusVariable::getAsFloat(void)
+{
+    return *(float*)_data;
+}
+
+uint32_t modbusVariable::getAsUint(void)
+{
+    return *(uint32_t*)_data;
+}
 
 uint8_t modbusVariable::readVar(void *data)
 {

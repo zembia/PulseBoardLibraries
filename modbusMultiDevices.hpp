@@ -31,6 +31,10 @@ class modbusVariable{
         String getFormatedData(void);
         void    setModbusHandle(ModbusMaster *);
         modbusDataType getDataType(void);
+
+        float getAsFloat(void);
+        uint32_t getAsUint(void);
+
     private:
         void *_data;
         uint16_t       _address;
