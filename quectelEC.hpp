@@ -23,8 +23,6 @@
 #define EXCECUTION_PERIOD 5000
 
 
-#define APN_STRING "data.mono"
-
 enum class EC25_FLAGS:uint8_t {
     EC25_OK, 
     EC25_ERROR,  
@@ -73,6 +71,7 @@ class quectelEC{
         uint16_t        getBattery(void);
         bool            enableMQTTReceive(void);
         bool            getInitStatus(void);
+        const char *    getImei(void);
 
         
     private:

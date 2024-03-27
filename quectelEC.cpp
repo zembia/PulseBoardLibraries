@@ -19,7 +19,10 @@ uint16_t quectelEC::getBattery(void)
     
 
 }
-
+const char *quectelEC::getImei(void)
+{
+    return _Imei;
+}
 void quectelEC::_clearFlags(void)
 {
     EC_RESPONSE.w = 0;
@@ -506,8 +509,17 @@ void quectelEC::powerUp(void)
     {
         ESP_LOGD(logtag,"AT+CMEE=2 OK received");
     }
-
-    _getImei();
+    for (int i=0 ;i<10;i++)
+    {
+        if (_getImei())
+        {
+            break;
+        }
+        else
+        {
+            vTaskDelay(100);
+        }
+    }
 
     //GPRS_Serial.println("AT+IPR=115200;&W");
     _gprsInitDone = true;
@@ -983,7 +995,7 @@ bool quectelEC::_checkSecondaryContext(void)
             //configure parameters of TCP/IP context
             //GPRS_Serial.println("AT+QICSGP=2,1,\"\",\"\" ,\"\" ,1");
             //GPRS_Serial.println("AT+QICSGP=2,1,\"data.mono\",\"\" ,\"\" ,1");
-            GPRS_Serial.printf("AT+QICSGP=2,1,\"%s\",\"\" ,\"\" ,1\r\n",APN_STRING);
+            GPRS_Serial.printf("AT+QICSGP=2,1,\"%s\",\"%s\" ,\"%s\" ,%u\r\n",_pulseConfiguration->getAPN(),_pulseConfiguration->getApnUser(),_pulseConfiguration->getApnPassword(),_pulseConfiguration->getApnAuth());
             if (_waitResponse(EC25_FLAGS::EC25_OK,300))
             {
                 ESP_LOGI(logtag,"QICSGP OK received");
@@ -1192,6 +1204,7 @@ uint16_t quectelEC::jsonHttpPost(const char *server, const char *payload)
         }
         _clearFlags();
         GPRS_Serial.print(payload);
+        ESP_LOGD(logtag,"postData: %s",payload);
 
         if (_waitResponse(EC25_FLAGS::EC25_OK,500))
         {
