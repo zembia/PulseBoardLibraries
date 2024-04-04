@@ -44,12 +44,17 @@ bool quectelEC::_getImei(void)
             strcpy(_Imei,_temptingImei);
             ESP_LOGD(logtag,"AT+GSN received. IMEI: %s",_Imei);
         }
+        else
+        {
+            ESP_LOGD(logtag,"AT+GSN received. IMEI not received");
+        }
         xSemaphoreGive(_gprsMutex);
     }
     else
     {
         return false;
     }
+    if (strlen(_Imei) == 0) return false;
     return true;
 }
 quectelEC::quectelEC(PCAL9535A::PCAL9535A<TwoWire> &gpio,SemaphoreHandle_t &i2cMutex)
@@ -421,6 +426,7 @@ void quectelEC::clearWanOperation(void)
 
 void quectelEC::powerUp(void)
 {
+    _clearFlags();
     ESP_LOGD(logtag,"Powering up GPRS");
     if (_i2cMutex == NULL)
     {
@@ -509,7 +515,10 @@ void quectelEC::powerUp(void)
     {
         ESP_LOGD(logtag,"AT+CMEE=2 OK received");
     }
-    for (int i=0 ;i<10;i++)
+
+    ESP_LOGD(logtag,"Getting IMEI");
+
+    for (int i=0 ;i<20;i++)
     {
         if (_getImei())
         {
@@ -517,7 +526,7 @@ void quectelEC::powerUp(void)
         }
         else
         {
-            vTaskDelay(100);
+            vTaskDelay(200);
         }
     }
 
@@ -1293,7 +1302,7 @@ uint8_t quectelEC::syncNtpServer(const char *server, uint8_t port)
       {
         ESP_LOGW(logtag,"WARNING: NTP SYNC FUNCTION NOT SET");
       }
-      strftime(localtimeBuffer, 30, "%FT%T%z", &timeinfo);
+      strftime(localtimeBuffer, 30, "%FT%T%Z", &timeinfo);
       ESP_LOGI(logtag,"NTP TIME SYNCED CORRECTLY: %s",localtimeBuffer);
       
 

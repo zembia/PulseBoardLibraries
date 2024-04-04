@@ -49,7 +49,12 @@ void modbusVariable::setModbusHandle(ModbusMaster *modbusReader)
 
 float modbusVariable::getAsFloat(void)
 {
-    return *(float*)_data;
+    return *(float*)_data; 
+}
+
+bool modbusVariable::isMeasurementValid(void)
+{
+    return _lastReadSuccess;
 }
 
 uint32_t modbusVariable::getAsUint(void)
@@ -57,7 +62,7 @@ uint32_t modbusVariable::getAsUint(void)
     return *(uint32_t*)_data;
 }
 
-uint8_t modbusVariable::readVar(void *data)
+uint8_t modbusVariable::readVar(bool data)
 {
     uint8_t result = 255;
     switch(_varDataType)
@@ -72,9 +77,13 @@ uint8_t modbusVariable::readVar(void *data)
             result = readReal();
             break;
     }
+    
     if (result != _modbusReader->ku8MBSuccess)
     {
-        _lastReadSuccess = false;
+        if (data==true)
+        {
+            _lastReadSuccess = false;
+        }
     }
     else
     {

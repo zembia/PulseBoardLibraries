@@ -27,11 +27,11 @@ class modbusVariable{
         ~modbusVariable();
         const char *getName(void);
         uint16_t getRegisterAddress(void);
-        uint8_t readVar(void *dataResult);
+        uint8_t readVar(bool updateStatus);
         String getFormatedData(void);
         void    setModbusHandle(ModbusMaster *);
         modbusDataType getDataType(void);
-
+        bool isMeasurementValid(void);
         float getAsFloat(void);
         uint32_t getAsUint(void);
 
