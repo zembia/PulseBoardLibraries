@@ -48,6 +48,10 @@ class deviceConfig{
         POST_METHOD getCurrentMethod(void);
         void setCustomName(String name);
         const char* getCustomName(void);
+        const char* getCodigoObraDGA(void);
+        bool        getDGAenabled(void);
+        void        setDGAconfig(String, uint16_t);
+        uint16_t    getDGASampleRate(void);
 
     private:
         String      _user;
@@ -64,6 +68,9 @@ class deviceConfig{
         uint8_t     _apnAuthMethod;
         uint16_t    _mqttPort;
         POST_METHOD _postMethod;
+        bool        _DGAenable;
+        String      _dgaCodigoObra;
+        uint16_t    _dgaSampleRate;
 
         void        _refreshCredentials(void);
         void        _refreshMqtt(void);

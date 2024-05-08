@@ -159,6 +159,18 @@ void quectelEC::_gprsConnectionLoop(void)
             {
                 _clearFlags();
 
+                //We stop any pending request
+                GPRS_Serial.println("AT+QHTTPSTOP");
+                if (_waitResponseWithError(EC25_FLAGS::EC25_OK,300,true))
+                {
+                    ESP_LOGI(logtag,"QHTTPSTOP OK received");
+                }
+                else
+                {
+                    ESP_LOGE(logtag,"QHTTPSTOP OK not received");
+                }
+
+
                 //Configure context for http
                 GPRS_Serial.println("AT+QHTTPCFG=\"contextid\",1");
                 if (_waitResponse(EC25_FLAGS::EC25_OK,300))
@@ -434,10 +446,19 @@ void quectelEC::powerUp(void)
     }
     if (xSemaphoreTake(*_i2cMutex, (TickType_t ) 100) == pdTRUE) 
     {
+        ESP_LOGD(logtag,"Setting EC25_NET_STATUS_PIN PinMode");
+        _gpio->pinMode(EC25_NET_STATUS_PIN,1);
         ESP_LOGD(logtag,"Setting EC25_NET_MODE_PIN PinMode");
         _gpio->pinMode(EC25_NET_MODE_PIN,1);
         ESP_LOGD(logtag,"Driving EC25_NET_MODE_PIN LOW");
         _gpio->digitalWrite(EC25_NET_MODE_PIN,LOW);
+        ESP_LOGD(logtag,"Driving EC25_NET_STATUS_PIN LOW");
+        _gpio->digitalWrite(EC25_NET_STATUS_PIN,LOW);
+
+        ESP_LOGD(logtag,"Setting EC25_DRT_PIN PinMode");
+        _gpio->pinMode(EC25_DTR_PIN,1);
+        ESP_LOGD(logtag,"Driving EC25_DTR_PIN LOW");
+        _gpio->digitalWrite(EC25_DTR_PIN,LOW);
         xSemaphoreGive(*_i2cMutex);
     }
     else
@@ -447,6 +468,7 @@ void quectelEC::powerUp(void)
     }
     ESP_LOGI(logtag,"Powering up GPRS PSU");
     Serial.flush();
+    _clearFlags();
     digitalWrite(GPRS_POWER_PIN,HIGH);
     vTaskDelay(pdMS_TO_TICKS(30));
     for (int i=0;i<5;i++)
@@ -457,8 +479,9 @@ void quectelEC::powerUp(void)
         delay(GPRS_PWRKEY_ON_TIME);
         digitalWrite(GPRS_PWRKEY,LOW);
 
+        
         ESP_LOGD(logtag,"PWRKEY released");
-
+        
         if (_waitForSignal(GPRS_STATUS,0,3000))
         {
             ESP_LOGD(logtag,"GPRS Powered on");
@@ -466,10 +489,16 @@ void quectelEC::powerUp(void)
             if (xSemaphoreTake(*_i2cMutex, (TickType_t )100) == pdTRUE) 
             {
                 _gpio->pinMode(EC25_NET_MODE_PIN,0);
+                _gpio->pinMode(EC25_NET_STATUS_PIN,0);
+                _gpio->pinMode(EC25_DTR_PIN,0);
                 xSemaphoreGive(*_i2cMutex);
             }
             break;
         }
+        /*if (EC_RESPONSE.RDY)
+        {
+            break;
+        }*/
     }
     //We receive a RDY text when the modem is ready for AT commands
 
@@ -481,33 +510,54 @@ void quectelEC::powerUp(void)
     {
         ESP_LOGD(logtag,"RDY received");
     }
-
+    
     for (int i=0;i<10;i++)
     {
         if (xSemaphoreTake(_gprsMutex, (TickType_t ) pdMS_TO_TICKS(500)) == pdTRUE) 
         {
+            ESP_LOGD(logtag,"Sent: AT");
             GPRS_Serial.println("AT");
             xSemaphoreGive(_gprsMutex);
         }
-        if (_waitResponse(EC25_FLAGS::EC25_OK,100))
+        if (_waitResponse(EC25_FLAGS::EC25_OK,500))
         {
             ESP_LOGD(logtag,"AT OK received");
+            break;
         }
-        break;
+        
     }
-
+    //Only for quectel EC200?
     if (xSemaphoreTake(_gprsMutex, (TickType_t ) pdMS_TO_TICKS(500)) == pdTRUE) 
     {
-        GPRS_Serial.println("ATE0");
+        ESP_LOGD(logtag,"Sent: AT+QSCLKEX=0");
+        GPRS_Serial.println("AT+QSCLKEX=0");
         xSemaphoreGive(_gprsMutex);
     }
     if (_waitResponse(EC25_FLAGS::EC25_OK,300))
     {
-        ESP_LOGD(logtag,"ATE0 OK received");
+        ESP_LOGD(logtag,"AT+QSCLKEX OK received");
+    }
+
+    for (int i=0;i<5;i++)
+    {
+        if (xSemaphoreTake(_gprsMutex, (TickType_t ) pdMS_TO_TICKS(500)) == pdTRUE) 
+        {
+            ESP_LOGD(logtag,"Sent: ATE0");
+            GPRS_Serial.println("ATE0");
+            xSemaphoreGive(_gprsMutex);
+            
+        }
+        if (_waitResponse(EC25_FLAGS::EC25_OK,300))
+        {
+            ESP_LOGD(logtag,"ATE0 OK received");
+            break;
+        }
+        vTaskDelay(100);
     }
 
     if (xSemaphoreTake(_gprsMutex, (TickType_t ) pdMS_TO_TICKS(500)) == pdTRUE) 
     {
+        ESP_LOGD(logtag,"Sent: AT+CMEE=2");
         GPRS_Serial.println("AT+CMEE=2");
         xSemaphoreGive(_gprsMutex);
     }
@@ -515,6 +565,20 @@ void quectelEC::powerUp(void)
     {
         ESP_LOGD(logtag,"AT+CMEE=2 OK received");
     }
+
+    if (xSemaphoreTake(_gprsMutex, (TickType_t ) pdMS_TO_TICKS(500)) == pdTRUE) 
+    {
+        ESP_LOGD(logtag,"Sent: AT+QURCCFG=\"urcport\",\"uart1\"");
+        GPRS_Serial.println("AT+QURCCFG=\"urcport\",\"uart1\"");
+        xSemaphoreGive(_gprsMutex);
+    }
+    if (_waitResponse(EC25_FLAGS::EC25_OK,300))
+    {
+        ESP_LOGD(logtag,"AT+QURCCFG=\"urcport\",\"uart1\" OK received");
+    }
+
+
+
 
     ESP_LOGD(logtag,"Getting IMEI");
 
@@ -526,7 +590,7 @@ void quectelEC::powerUp(void)
         }
         else
         {
-            vTaskDelay(200);
+            vTaskDelay(400);
         }
     }
 
@@ -601,6 +665,23 @@ bool quectelEC::_checkCreg(void)
         if (_lastCode == 3)
         {
             ESP_LOGE(logtag,"NETWORK REGISTRATION DENIED");
+        }
+        else if (_lastCode == 0)
+        {
+            if (xSemaphoreTake(_gprsMutex, (TickType_t ) pdMS_TO_TICKS(10000)) == pdTRUE) 
+            {
+                ESP_LOGD(logtag,"AT+CGATT=1");
+                GPRS_Serial.println("AT+CGATT=1");
+                if (_waitResponse(EC25_FLAGS::EC25_OK,500))
+                {
+                    ESP_LOGI(logtag,"AT+CGATT=1 OK received");
+                }
+                xSemaphoreGive(_gprsMutex);
+            }
+            else
+            {
+                return lastConnStatus;
+            }
         }
         else
         {
@@ -1097,6 +1178,10 @@ void quectelEC::reset(void)
     {
         _gpio->pinMode(EC25_NET_MODE_PIN,1);
         _gpio->digitalWrite(EC25_NET_MODE_PIN,LOW);
+        _gpio->pinMode(EC25_NET_STATUS_PIN,1);
+        _gpio->digitalWrite(EC25_NET_STATUS_PIN,LOW);
+        _gpio->pinMode(EC25_DTR_PIN,1);
+        _gpio->digitalWrite(EC25_DTR_PIN,LOW);
         xSemaphoreGive(*_i2cMutex);
     }
     else
@@ -1145,6 +1230,17 @@ uint16_t quectelEC::jsonHttpPost(const char *server, const char *payload)
         _clearFlags();
         //HTTP CONNECT
         //Configuring application/json        
+        
+        GPRS_Serial.println("AT+QHTTPSTOP");
+        if (_waitResponseWithError(EC25_FLAGS::EC25_OK,300,true))
+        {
+            ESP_LOGI(logtag,"QHTTPSTOP OK received");
+        }
+        else
+        {
+             ESP_LOGE(logtag,"QHTTPSTOP OK not received");
+        }
+
         GPRS_Serial.println("AT+QHTTPCFG=\"contenttype\",4");
         if (_waitResponse(EC25_FLAGS::EC25_OK,300))
         {
@@ -1152,6 +1248,7 @@ uint16_t quectelEC::jsonHttpPost(const char *server, const char *payload)
         }
         else
         {
+           
             ESP_LOGE(logtag,"QHTTPCFG OK not received");
             xSemaphoreGive(_gprsMutex);
             _failedPosts++;

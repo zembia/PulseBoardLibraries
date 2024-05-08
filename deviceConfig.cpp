@@ -3,6 +3,8 @@
 
 deviceConfig::deviceConfig(void)
 {
+
+    _DGAenable = false;
     //At the constructor we get the credentials from NV memory
     _refreshCredentials();
 
@@ -194,6 +196,29 @@ void deviceConfig::setCredentials(String user, String password)
     _refreshCredentials();
 }
 
+
+void deviceConfig::setDGAconfig(String codigoObra, uint16_t sampleRate)
+{
+    _dgaSampleRate = sampleRate;
+    _dgaCodigoObra = codigoObra;
+    _DGAenable = true;
+}
+
+uint16_t deviceConfig::getDGASampleRate(void)
+{
+    return _dgaSampleRate;
+}
+
+
+const char *deviceConfig::getCodigoObraDGA(void)
+{
+    return _dgaCodigoObra.c_str();
+}
+
+bool deviceConfig::getDGAenabled(void)
+{
+    return _DGAenable;
+}
 
 /**********************************************************************/
 /*                                                                    */
