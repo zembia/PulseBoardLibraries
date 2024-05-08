@@ -99,7 +99,11 @@ void setup()
 
     //initializing i2c devices
     Wire.begin(SDA_PIN,SCL_PIN,I2C_SPEED);
-    gpio.begin();
+    if (xSemaphoreTake(i2cSemaphore, (TickType_t)5) == pdTRUE) {
+      gpio.begin();
+      xSemaphoreGive(i2cSemaphore);
+      //Trow an error
+    }
 
     //Initialize pulse configuration
     pulseConfiguration = new deviceConfig();
