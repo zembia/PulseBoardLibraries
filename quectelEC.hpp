@@ -140,7 +140,7 @@ class quectelEC{
         TaskHandle_t    _gprsLoopTaskHandle;
         PCAL9535A::PCAL9535A<TwoWire> *_gpio;
         SemaphoreHandle_t *_i2cMutex;
-        SemaphoreHandle_t _gprsMutex;
+        SemaphoreHandle_t _gprsMutex=NULL;
         uint16_t        _lastCode;
 
         bool            _mqttServerOpen;
