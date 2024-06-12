@@ -13,10 +13,10 @@ modbusVariable::modbusVariable(uint16_t address, modbusDataType varDataType, con
     _varDataType = varDataType;
     switch (_varDataType)
     {
-        /*case INT16:
+        case INT16:
         case UINT16:
             _data = malloc(sizeof(uint16_t));
-            break;*/
+            break;
         case INT32:
         case DWORD:
         case UINT32:
@@ -66,7 +66,10 @@ uint8_t modbusVariable::readVar(bool data)
 {
     uint8_t result = 255;
     switch(_varDataType)
-    {
+    {	
+		case INT16:
+		case UINT16:
+			result = readSHORT();
         case INT32:
         case UINT32:
         case DWORD:
@@ -102,6 +105,12 @@ String modbusVariable::getFormatedData(void)
     }
     switch(_varDataType)
     {
+		case INT16:
+			snprintf(tempCString,20,"%d",*(int16_t*)_data);
+			break;
+		case UINT16:
+			snprintf(tempCString,20,"%u",*(uint16_t*)_data);
+			break;
         case INT32:
             snprintf(tempCString,20,"%d",*(int32_t*)_data);
             break;
@@ -146,6 +155,31 @@ uint8_t modbusVariable::readReal(void)
 
     return result;
 }
+
+uint8_t modbusVariable::readSHORT(void)
+{
+	if (_data == NULL)
+    {
+        return -1;
+    }
+    //there should be a check here, but these funcitions won't be called by public methods
+    
+    uint8_t result;
+    uint8_t data_size = 1;
+    uint16_t buf[data_size] ={0};
+    result = _modbusReader->readHoldingRegisters(_address,data_size);
+    if (result == _modbusReader->ku8MBSuccess)
+    {
+        for (uint8_t j=0;j<data_size;j++)
+        {
+            buf[j] = _modbusReader->getResponseBuffer(j);
+        }
+        
+    }
+    memcpy(_data,buf,sizeof(uint16_t));
+    return result;
+}
+
 
 uint8_t modbusVariable::readDWORD(void)
 {

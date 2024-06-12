@@ -7,8 +7,8 @@
 #include "ModbusMasterFork.h"
 
 enum modbusDataType{
-    //INT16,
-    //UINT16,
+    INT16,
+    UINT16,
     DWORD,
     INT32,
     UINT32,
@@ -43,6 +43,8 @@ class modbusVariable{
         ModbusMaster    *_modbusReader;
         uint8_t        readReal(void);
         uint8_t        readDWORD(void);
+		uint8_t 		readSHORT(void);
+
         bool            _lastReadSuccess;
 };
 
