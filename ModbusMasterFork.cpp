@@ -722,6 +722,11 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
   
   u8ModbusADUSize = 0;
   _serial->flush();    // flush transmit buffer
+  
+  if (_postTransmission)
+  {
+    _postTransmission();
+  }
 
   //if there was any spurious transaction before finishing the buffer, inmidiately we should see
   //data available 
@@ -737,10 +742,7 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
     _serial->read();
   }
 
-  if (_postTransmission)
-  {
-    _postTransmission();
-  }
+
   
   // loop until we run out of time or bytes, or an error occurs
   u32StartTime = millis();
