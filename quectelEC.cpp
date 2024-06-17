@@ -75,13 +75,17 @@ quectelEC::quectelEC(PCAL9535A::PCAL9535A<TwoWire> &gpio,SemaphoreHandle_t &i2cM
     _postNtpSync    = NULL;
 
     pinMode(GPRS_PWRKEY,OUTPUT);
-    pinMode(GPRS_POWER_PIN,OUTPUT);
+    #ifdef ARDUINO_ESP32_PICO 
+        pinMode(GPRS_POWER_PIN,OUTPUT);
+    #endif
     pinMode(GPRS_RESET,OUTPUT);
     pinMode(GPRS_STATUS,INPUT);
 
     digitalWrite(GPRS_RESET,LOW);
     digitalWrite(GPRS_PWRKEY,LOW);
-    digitalWrite(GPRS_POWER_PIN,LOW);
+    #ifdef ARDUINO_ESP32_PICO 
+        digitalWrite(GPRS_POWER_PIN,LOW);
+    #endif
     GPRS_Serial.begin(GPRS_BAUDRATE,SERIAL_8N1,GPRS_RX,GPRS_TX);
 
     if (_gprsMutex == NULL)
@@ -469,7 +473,17 @@ void quectelEC::powerUp(void)
     ESP_LOGI(logtag,"Powering up GPRS PSU");
     Serial.flush();
     _clearFlags();
-    digitalWrite(GPRS_POWER_PIN,HIGH);
+    
+    #ifdef ARDUINO_ESP32_PICO 
+        digitalWrite(GPRS_POWER_PIN,HIGH);
+    #else
+        if (_waitForSignal(GPRS_STATUS,0,100))
+        {
+            ESP_LOGD(logtag,"It seems GPRS was already on");
+            powerDownGPRS();
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
+    #endif
     vTaskDelay(pdMS_TO_TICKS(30));
     for (int i=0;i<5;i++)
     {
@@ -625,7 +639,9 @@ void quectelEC::powerDownGPRS(void)
     ESP_LOGI(logtag,"powering down modem");
     GPRS_Serial.write("AT+QPOWD\r\n");
     _waitForSignal(GPRS_STATUS,1,8000);
-    digitalWrite(GPRS_POWER_PIN,LOW);
+    #ifdef ARDUINO_ESP32_PICO 
+        digitalWrite(GPRS_POWER_PIN,LOW);
+    #endif
     ESP_LOGI(logtag,"Modem OFF");
 }
 
