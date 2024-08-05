@@ -421,6 +421,11 @@ bool quectelEC::enableMQTTReceive(void)
         {
             ESP_LOGD(logtag,"AT+QMTSUB received");
         }
+		else
+		{	
+			xSemaphoreGive(_gprsMutex);
+			return false;
+		}
         xSemaphoreGive(_gprsMutex);
     }
     else
