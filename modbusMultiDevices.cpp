@@ -70,6 +70,7 @@ uint8_t modbusVariable::readVar(bool data)
 		case INT16:
 		case UINT16:
 			result = readSHORT();
+			break;
         case INT32:
         case UINT32:
         case DWORD:
