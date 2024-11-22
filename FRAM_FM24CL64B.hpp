@@ -11,7 +11,7 @@ class FRAM_FM24{
     public:
         FRAM_FM24(SemaphoreHandle_t &i2cMutex,TwoWire &port = Wire, uint8_t address=FRAM_DEFAULT_ADDR);
         bool writeArray(uint16_t address, uint16_t size, uint8_t *data);
-        bool readArray(uint16_t address, uint16_t size, uint8_t *data);
+        bool readArray(uint16_t address, size_t size, uint8_t *data);
         bool selfTest(void);
     private:
         uint8_t _i2cAddr;

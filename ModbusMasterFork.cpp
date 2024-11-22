@@ -599,8 +599,8 @@ Sequence:
 */
 uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
 {
-  uint8_t u8ModbusADU[256];
-  uint8_t u8ModbusADUSize = 0;
+  //uint8_t u8ModbusADU[256];
+  //uint8_t u8ModbusADUSize = 0;
   uint8_t i, u8Qty;
   uint16_t u16CRC;
   uint32_t u32StartTime;
@@ -704,6 +704,10 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
   // flush receive buffer before transmitting request
   //while (_serial->read() != -1); //This is too slow, because it relies in timeouts
   
+  /*for (i = 0; i < u8ModbusADUSize; i++)
+  {
+    ESP_LOGI("MODBUS MASTER FORK", "BYTE %d: %02X", i,u8ModbusADU[i]);
+  }*/
   //better solution
   while (_serial->available() != 0)
   {
@@ -722,6 +726,11 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
   
   u8ModbusADUSize = 0;
   _serial->flush();    // flush transmit buffer
+  
+  if (_postTransmission)
+  {
+    _postTransmission();
+  }
 
   //if there was any spurious transaction before finishing the buffer, inmidiately we should see
   //data available 
@@ -737,10 +746,7 @@ uint8_t ModbusMaster::ModbusMasterTransaction(uint8_t u8MBFunction)
     _serial->read();
   }
 
-  if (_postTransmission)
-  {
-    _postTransmission();
-  }
+
   
   // loop until we run out of time or bytes, or an error occurs
   u32StartTime = millis();

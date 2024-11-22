@@ -24,6 +24,7 @@
 #define EC25_DTR_PIN 8
 #define EXCECUTION_PERIOD 5000
 
+#define RECEIVED_DATA_LENGTH 1000
 
 enum class EC25_FLAGS:uint8_t {
     EC25_OK, 
@@ -74,7 +75,8 @@ class quectelEC{
         bool            enableMQTTReceive(void);
         bool            getInitStatus(void);
         const char *    getImei(void);
-
+	String 		getReceivedData(void);
+	bool 		isDataAvailable(void);
         
     private:
         void            _gprsConnectionLoop(void);
@@ -92,7 +94,8 @@ class quectelEC{
         bool            _checkSecondaryContext(void);        
         bool            _configMqttServer(void);
         bool            _getImei(void);
-        
+     	char            _receivedData[RECEIVED_DATA_LENGTH];  
+	bool		_dataReceived = false;
 
         union QUECTEL_RESPONSE{
             struct{

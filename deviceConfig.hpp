@@ -30,7 +30,7 @@ class deviceConfig{
     public:
         deviceConfig(void);
         void setCredentials(String user, String password);
-        void configMqtt(String mqttUrl,String mqttTopic, uint16_t mqttPort);
+        void configMqtt(String mqttUrl,String mqttTopic, uint16_t mqttPort, String mqttTopicRx="defaultRx");
         void configHttp(String httpUrl);
         void setSamplePeriod(uint16_t);
         const char* getUrl(void);
@@ -38,6 +38,7 @@ class deviceConfig{
         const char* getPassword(void);
         uint16_t getPort(void);
         const char* getTopic(void);
+        const char* getTopicRx(void);
         uint16_t getSamplePeriod(void);
         const char* getAPN(void);
         const char* getApnPassword(void);
@@ -61,6 +62,7 @@ class deviceConfig{
         String      _mqttUrl;
         String      _httpUrl;
         String      _mqttTopic;
+        String      _mqttTopicRx;
         String      _apn;
         String      _apn_user;
         String      _apn_password;

@@ -194,6 +194,14 @@ public:
   void pinMode(uint8_t pin, uint8_t mode)
   {
     updateRegisterBit(pin, (mode == 0 ? 1 : 0), RegisterAddress::P0_CONFIG, RegisterAddress::P1_CONFIG);
+    
+    if (pin < 8) {
+    	pca_bitWrite(_internalIo_0, pinToBit(pin), (mode == 0 ? 1 : 0));
+    }
+    else {
+    	pca_bitWrite(_internalIo_1, pinToBit(pin), (mode == 0 ? 1 : 0));
+    }
+
   }
 
   /**
@@ -201,18 +209,51 @@ public:
    * \param pin Pin to set (0 to 15)
    * \param value Value to set to (LOW or HIGH)
    */
-  void digitalWrite(uint8_t pin, uint8_t value)
+  bool digitalWrite(uint8_t pin, uint8_t value)
   {
     const RegisterAddress regAddr = pinToReg(pin, RegisterAddress::P0_OUTPUT, RegisterAddress::P1_OUTPUT);
+    
+    uint8_t tmp,  mask;
+
+    if (pin < 8) {
+    	pca_bitWrite(_internalReg_0, pinToBit(pin), value);
+    	writeRegister(regAddr, _internalReg_0); 
+    	tmp = readRegister(regAddr);
+
+	//ESP_LOGE("IOEXPANDER", "Io 0: 0x%02X", _internalIo_0);
+ 	//ESP_LOGE("IOEXPANDER", "Internal 0: 0x%02X - read: 0x%02X", _internalReg_0, tmp);
+	//mask = 0xF9;
+	mask = ~_internalIo_0;
+
+    	if ((_internalReg_0&mask) != (tmp&mask)) { // OJO TODO: find a better way to obtain bit mask
+ 	    ESP_LOGE("IOEXPANDER", "Register read 0 doesn't match internal register. internal: 0x%02X - read: 0x%02X", _internalReg_0&mask, tmp&mask);
+	    return false;
+   	}
+    }
+    else {
+    	pca_bitWrite(_internalReg_1, pinToBit(pin), value);
+    	writeRegister(regAddr, _internalReg_1);
+    	tmp = readRegister(regAddr);
+ 	
+ 	//ESP_LOGE("IOEXPANDER", "Io 1: 0x%02X", _internalIo_1);
+	//ESP_LOGE("IOEXPANDER", "Internal 1: 0x%02X - read: 0x%02X", _internalReg_0, tmp);
+	//mask = 0x8F;
+	mask = ~_internalIo_1;
+    	if ((_internalReg_1&mask) != (tmp&mask)) { // OJO TODO:
+ 	    ESP_LOGE("IOEXPANDER", "Register read 1 doesn't match internal register. internal: 0x%02X - read: 0x%02X", _internalReg_1&mask, tmp&mask);
+	    return false;
+   	}
+    }
 
     // read the current GPIO state, so we can modify only this one pin
-    uint8_t gpio = readRegister(regAddr);
-
+    // uint8_t gpio = readRegister(regAddr);
+    
     // update the GPIO state with the pin we wish to set
-    pca_bitWrite(gpio, pinToBit(pin), value);
+    // pca_bitWrite(gpio, pinToBit(pin), value);
 
     // write the new GPIO state back out
-    writeRegister(regAddr, gpio);
+    // writeRegister(regAddr, gpio);
+    return true;
   }
 
   /**
@@ -346,6 +387,10 @@ public:
  private:
   uint8_t _i2caddr;
   WIRE& mWire;
+  uint8_t _internalReg_0;
+  uint8_t _internalReg_1;
+  uint8_t _internalIo_0 = 0xFF;
+  uint8_t _internalIo_1 = 0xFF;
 
   /**
    * Convert a given pin (0 - 15) to a port bit number (0 - 7)
@@ -414,7 +459,7 @@ public:
 
     // set the value for the particular bit
     pca_bitWrite(regValue, pinToBit(pin), value);
-
+    
     writeRegister(regAddr, regValue);
   }
 

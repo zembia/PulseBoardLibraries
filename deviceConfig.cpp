@@ -77,11 +77,12 @@ void deviceConfig::configHttp(String httpUrl)
     _preferences.end();
     _refreshHttp();
 }
-void deviceConfig::configMqtt(String mqttUrl,String mqttTopic, uint16_t mqttPort)
+void deviceConfig::configMqtt(String mqttUrl,String mqttTopic, uint16_t mqttPort, String mqttTopicRx)
 {
     _preferences.begin("mqtt",false);
     _preferences.putUShort("port",mqttPort);
     _preferences.putString("topic",mqttTopic);
+    _preferences.putString("topicRx",mqttTopicRx);
     _preferences.putString("url",mqttUrl);
     _preferences.end();
     _refreshMqtt();
@@ -111,6 +112,10 @@ const char * deviceConfig::getTopic(void)
 {
     return _mqttTopic.c_str();
 }
+const char * deviceConfig::getTopicRx(void)
+{
+    return _mqttTopicRx.c_str();
+}
 
 uint16_t deviceConfig::getSamplePeriod(void)
 {
@@ -122,6 +127,7 @@ void deviceConfig::_refreshMqtt(void)
     _preferences.begin("mqtt",false); 
     _mqttPort   = _preferences.getUShort("port",1883);
     _mqttTopic  = _preferences.getString("topic","");
+    _mqttTopicRx = _preferences.getString("topicRx","");
     _mqttUrl    = _preferences.getString("url","");
     _preferences.end();
 }

@@ -3,7 +3,7 @@
 
 scheduller::scheduller(uint32_t timePeriod, void (*callbackFunction)(),uint32_t heapSize)
 {
-    if (_timePeriod<=0)
+    if (timePeriod<=0)
     {
         ESP_LOGE("scheduller","INVALID TIME PERIOD");
         return;

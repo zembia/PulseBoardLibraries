@@ -59,7 +59,7 @@ bool quectelEC::_getImei(void)
 }
 quectelEC::quectelEC(PCAL9535A::PCAL9535A<TwoWire> &gpio,SemaphoreHandle_t &i2cMutex)
 {
-
+    _gprsMutex = NULL;
     _battery = 0;
     _gpio = &gpio;
     _i2cMutex = &i2cMutex;
@@ -75,13 +75,17 @@ quectelEC::quectelEC(PCAL9535A::PCAL9535A<TwoWire> &gpio,SemaphoreHandle_t &i2cM
     _postNtpSync    = NULL;
 
     pinMode(GPRS_PWRKEY,OUTPUT);
-    pinMode(GPRS_POWER_PIN,OUTPUT);
+    #ifdef ARDUINO_ESP32_PICO
+    	pinMode(GPRS_POWER_PIN,OUTPUT);
+    #endif
     pinMode(GPRS_RESET,OUTPUT);
     pinMode(GPRS_STATUS,INPUT);
 
     digitalWrite(GPRS_RESET,LOW);
     digitalWrite(GPRS_PWRKEY,LOW);
-    digitalWrite(GPRS_POWER_PIN,LOW);
+    #ifdef ARDUINO_ESP32_PICO
+    	digitalWrite(GPRS_POWER_PIN,LOW);
+    #endif
     GPRS_Serial.begin(GPRS_BAUDRATE,SERIAL_8N1,GPRS_RX,GPRS_TX);
 
     if (_gprsMutex == NULL)
@@ -91,7 +95,15 @@ quectelEC::quectelEC(PCAL9535A::PCAL9535A<TwoWire> &gpio,SemaphoreHandle_t &i2cM
         {
             xSemaphoreGive(_gprsMutex);
         }
+	else {
+		ESP_LOGE(logtag, "error while creating mutex");
+	}
     }
+    else {
+	ESP_LOGE(logtag, "mutex already exists!");
+    }
+
+    
 
     //We need to create two task. One in charge of reading
     ESP_LOGI(logtag,"configuring GPRS");
@@ -304,6 +316,7 @@ void quectelEC::_process_gprs(char input_data)
                 //Reseteamos el valor de counter, pues no se procesa la misma linea
                 //dos veces
                 counter = 0;
+
                 //Parseamos el mensaje recibido    
                 _getResponse(_input_buffer);                       
                 _input_buffer[0]   =   0; //Para eliminar la ristra ya procesada        
@@ -361,6 +374,11 @@ void quectelEC::_process_gprs(char input_data)
                 {
                     qmtData[mqttDataPointer] = 0;
                     ESP_LOGD(logtag,"MQTT DATA:\r\n%s",qmtData);
+		    if (qmtLen < RECEIVED_DATA_LENGTH) {
+			//memset(_receivedData, 0, RECEIVED_DATA_LENGTH);
+		    	memcpy(_receivedData, qmtData, qmtLen+1);
+			_dataReceived = true;
+		    }
                     free(qmtData);
                 }
                 QMTSTATE = 0;
@@ -411,8 +429,8 @@ bool quectelEC::enableMQTTReceive(void)
     if (xSemaphoreTake(_gprsMutex, (TickType_t ) pdMS_TO_TICKS(150000)) == pdTRUE) 
     {
         _clearFlags();
-        GPRS_Serial.printf("AT+QMTSUB=0,1,\"%s\",1\r\n",_pulseConfiguration->getTopic());
-        ESP_LOGI(logtag,"AT+QMTSUB=0,1,\"%s\",1\r\n",_pulseConfiguration->getTopic());
+        GPRS_Serial.printf("AT+QMTSUB=0,1,\"%s\",1\r\n",_pulseConfiguration->getTopicRx());
+        ESP_LOGI(logtag,"AT+QMTSUB=0,1,\"%s\",1\r\n",_pulseConfiguration->getTopicRx());
         if (_waitResponse(EC25_FLAGS::EC25_OK,300))
         {
             ESP_LOGD(logtag,"AT+QMTSUB received");
@@ -424,6 +442,8 @@ bool quectelEC::enableMQTTReceive(void)
         ESP_LOGE(logtag,"COULD NOT GET SEMAPHORE");
         return false;
     }
+
+    return true;
 }
 
 bool quectelEC::getWanOperation(void)
@@ -469,7 +489,21 @@ void quectelEC::powerUp(void)
     ESP_LOGI(logtag,"Powering up GPRS PSU");
     Serial.flush();
     _clearFlags();
-    digitalWrite(GPRS_POWER_PIN,HIGH);
+
+    #ifdef ARDUINO_ESP32_PICO 
+        digitalWrite(GPRS_POWER_PIN,HIGH);
+    #else
+        if (_waitForSignal(GPRS_STATUS,0,100))
+        {
+            ESP_LOGD(logtag,"It seems GPRS was already on");
+            powerDownGPRS();
+            vTaskDelay(pdMS_TO_TICKS(2000));
+    	    _clearFlags();
+        }
+    #endif
+
+    _waitForSignal(GPRS_STATUS,1,5000);
+
     vTaskDelay(pdMS_TO_TICKS(30));
     for (int i=0;i<5;i++)
     {
@@ -513,6 +547,7 @@ void quectelEC::powerUp(void)
     
     for (int i=0;i<10;i++)
     {
+        ESP_LOGD(logtag,"LOOP!");
         if (xSemaphoreTake(_gprsMutex, (TickType_t ) pdMS_TO_TICKS(500)) == pdTRUE) 
         {
             ESP_LOGD(logtag,"Sent: AT");
@@ -625,7 +660,9 @@ void quectelEC::powerDownGPRS(void)
     ESP_LOGI(logtag,"powering down modem");
     GPRS_Serial.write("AT+QPOWD\r\n");
     _waitForSignal(GPRS_STATUS,1,8000);
-    digitalWrite(GPRS_POWER_PIN,LOW);
+    #ifdef ARDUINO_ESP32_PICO 
+        digitalWrite(GPRS_POWER_PIN,LOW);
+    #endif
     ESP_LOGI(logtag,"Modem OFF");
 }
 
@@ -1587,4 +1624,13 @@ String quectelEC::getIp(void)
 uint16_t quectelEC::getFailedPosts(void)
 {
     return _failedPosts;
+}
+
+String quectelEC::getReceivedData(void) {
+    _dataReceived = false;
+    return String(_receivedData);
+}
+
+bool quectelEC::isDataAvailable(void) {
+    return _dataReceived;
 }

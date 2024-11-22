@@ -55,7 +55,8 @@ bool FRAM_FM24::writeArray(uint16_t address,uint16_t size, uint8_t *data)
 
 }
 
-bool FRAM_FM24::readArray(uint16_t address,uint16_t size, uint8_t *data)
+//bool FRAM_FM24::readArray(uint16_t address,uint16_t size, uint8_t *data)
+bool FRAM_FM24::readArray(uint16_t address, size_t size, uint8_t *data)
 {
     bool result = true;
     //input validation
