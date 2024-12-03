@@ -106,12 +106,14 @@ class pulseIoPort{
 #define AI_SAMPLE_PERIOD 100
 class pulseAiPort{
     public:
-        pulseAiPort(const char *name, float gain, float offset,uint8_t address,SemaphoreHandle_t &i2cMutex ,TwoWire &port=Wire );
+        pulseAiPort(const char *name, float gain, float offset,bool requirePower,uint8_t address,SemaphoreHandle_t &i2cMutex ,TwoWire &port=Wire );
         float getConvertedData(void);
         float getRawData(void);
+        bool  getRequirePower(void);
     private:
         float               _gain;
         float               _offset;
+        bool                _requirePower;
         TwoWire             *_i2cPort;
         SemaphoreHandle_t   *_i2cMutex;
         char                *_name;

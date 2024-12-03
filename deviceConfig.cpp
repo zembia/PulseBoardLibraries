@@ -288,10 +288,11 @@ void pulseIoPort::setPortValue(bool inputData)
 /*                                                                    */
 /**********************************************************************/
 
-pulseAiPort::pulseAiPort(const char *name, float gain, float offset, uint8_t address,SemaphoreHandle_t &i2cMutex, TwoWire &port )
+pulseAiPort::pulseAiPort(const char *name, float gain, float offset,bool requirePower, uint8_t address,SemaphoreHandle_t &i2cMutex, TwoWire &port)
 {
     _gain = gain;
     _offset = offset;
+    _requirePower = requirePower;
 
     //To-Do: check for _name correct memory allocation;
     if (name != NULL)
@@ -346,6 +347,12 @@ float pulseAiPort::_readSensor(void)
         return _rawData;
     }
 }
+
+bool pulseAiPort::getRequirePower(void)
+{
+    return _requirePower;
+}
+
 
 void pulseAiPort::_sampleMethod(void)
 {
